@@ -14,6 +14,15 @@ logger = logging.getLogger(__name__)
 
 class AskRequest(BaseModel):
     question: str
+    modo: str = "auto"  # "auto", "factual", "cuento"
+
+KEYWORDS_CUENTO = {"escribe", "crea", "inventa", "cuento", "historia", "relato", "genera", "imagina", "narra", "redacta", "compone"}
+
+def _detect_modo(question: str) -> str:
+    words = set(question.lower().split())
+    if words & KEYWORDS_CUENTO:
+        return "cuento"
+    return "factual"
 
 class MultiCloudQAService:
     """Servicio QA con LLM cloud + embeddings locales"""
@@ -22,7 +31,8 @@ class MultiCloudQAService:
         self.config = config
         self.current_provider = None
         self.current_embedding_provider = None
-        self.qa_chain = None
+        self.qa_chain_factual = None
+        self.qa_chain_cuento = None
         
     def get_embeddings(self):
         embeddings = VoyageAIEmbeddings(
@@ -33,15 +43,14 @@ class MultiCloudQAService:
         logger.info("✅ Voyage AI embeddings configurados")
         return embeddings
     
-    def get_llm(self):
+    def get_llm(self, temperature: float = 0.1, max_tokens: int = 1024):
         llm = ChatAnthropic(
             api_key=self.config.anthropic_api_key,
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=4096,
-            temperature=0.1
+            model="claude-sonnet-4-6",
+            max_tokens=max_tokens,
+            temperature=temperature
         )
         self.current_provider = 'anthropic'
-        logger.info("✅ Claude (Anthropic) configurado")
         return llm
     
     def initialize_qa_chain(self):
@@ -56,19 +65,20 @@ class MultiCloudQAService:
             )
             retriever = db.as_retriever(search_kwargs={"k": 10})
             
-            llm = self.get_llm()
-            
-            self.qa_chain = RetrievalQA.from_chain_type(
-                llm=llm,
+            self.qa_chain_factual = RetrievalQA.from_chain_type(
+                llm=self.get_llm(temperature=0.1, max_tokens=1024),
                 chain_type="stuff",
                 retriever=retriever,
                 return_source_documents=True
             )
-            
-            logger.info(f"🚀 Sistema listo:")
-            logger.info(f"   📊 Embeddings: {self.current_embedding_provider.upper()}")
-            logger.info(f"   🤖 LLM: {self.current_provider.upper()}")
-            return self.qa_chain
+            self.qa_chain_cuento = RetrievalQA.from_chain_type(
+                llm=self.get_llm(temperature=0.85, max_tokens=8000),
+                chain_type="stuff",
+                retriever=retriever,
+                return_source_documents=True
+            )
+            logger.info("✅ Claude (Anthropic) configurado")
+            logger.info(f"🚀 Sistema listo — Embeddings: {self.current_embedding_provider.upper()} | LLM: {self.current_provider.upper()}")
             
         except Exception as e:
             logger.error(f"Error inicializando sistema: {e}")
@@ -129,10 +139,16 @@ async def ask(request: AskRequest):
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="La pregunta no puede estar vacía")
 
+    modo_efectivo = request.modo if request.modo != "auto" else _detect_modo(request.question)
+    chain = (app.state.qa_service.qa_chain_cuento
+             if modo_efectivo == "cuento"
+             else app.state.qa_service.qa_chain_factual)
+    logger.info(f"Modo: {modo_efectivo}")
+
     import time
     try:
         t0 = time.time()
-        result = app.state.qa_service.qa_chain({"query": request.question})
+        result = chain.invoke({"query": request.question})
         t1 = time.time()
         docs_sorted = result.get("source_documents", [])
         answer = result["result"]
@@ -173,6 +189,7 @@ async def ask(request: AskRequest):
         return {
             "answer": answer,
             "sources": sources,
+            "modo": modo_efectivo,
             "llm_provider": qa_service.current_provider,
             "embedding_provider": qa_service.current_embedding_provider
         }
