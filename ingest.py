@@ -4,7 +4,6 @@ import logging
 from typing import List, Dict, Any
 import fitz  
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from config import CloudConfig
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -58,7 +57,6 @@ def main():
         return
 
     try:
-        config = CloudConfig()
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=CHUNK_SIZE,
             chunk_overlap=CHUNK_OVERLAP
