@@ -29,3 +29,9 @@ requests
 
 # NLP para procesamiento de texto en español
 spacy>=3.8.0
+
+# PDF generation
+reportlab
+
+# Async HTTP (Leonardo AI)
+httpx

@@ -13,6 +13,7 @@ class CloudConfig:
         self.voyage_api_key = os.getenv("VOYAGE_API_KEY")
         self.voyage_model = os.getenv("VOYAGE_MODEL", "voyage-3")
         self.database_url = os.getenv("DATABASE_URL")
+        self.leonardo_api_key = os.getenv("LEONARDO_API_KEY", "")
         self._validate_config()
 
     def _validate_config(self):

@@ -44,9 +44,14 @@ desktop.ini
 pdfs/*
 !pdfs/.gitkeep
 
+# Cuentos generados
+cuentos/*
+!cuentos/.gitkeep
+
 # Deploy
 .vercel
 .dockerignore.local
 
 # Claude Code internal
 .claude/
+
