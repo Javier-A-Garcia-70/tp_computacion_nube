@@ -1,5 +1,8 @@
 import sys
+import argparse
 import requests
+
+BASE_URL = "http://localhost:8000"
 
 def holmes_prompt(question):
     return (
@@ -12,6 +15,45 @@ def holmes_prompt(question):
         "Separa los párrafos usando una línea vacía. "
         f"Pregunta: {question}"
     )
+
+def print_sources(sources):
+    if not sources:
+        return
+    print("\n📚 Fuentes consultadas:")
+    for src in sources:
+        print(f"• {src['source']} (chunk {src['chunk_id']})")
+        print(f"  ↳ {src['preview']}\n")
+
+def ask(question, modo="auto", nombre=None, timeout=180):
+    response = requests.post(
+        f"{BASE_URL}/ask",
+        json={"question": question, "modo": modo, "nombre": nombre},
+        headers={"Content-Type": "application/json"},
+        timeout=timeout
+    )
+    response.raise_for_status()
+    data = response.json()
+    print(data.get("answer"), "\n")
+    print_sources(data.get("sources", []))
+
+def story(prompt, nombre=None, formato="chat", timeout=180):
+    response = requests.post(
+        f"{BASE_URL}/generate-story",
+        json={"prompt": prompt, "nombre": nombre, "formato": formato},
+        headers={"Content-Type": "application/json"},
+        timeout=timeout
+    )
+    response.raise_for_status()
+
+    if formato == "pdf":
+        filename = response.headers.get("Content-Disposition", "").split("filename=")[-1] or "cuento.pdf"
+        with open(f"cuentos/{filename}", "wb") as f:
+            f.write(response.content)
+        print(f"📄 PDF guardado en cuentos/{filename}")
+    else:
+        data = response.json()
+        print(data.get("story"), "\n")
+        print_sources(data.get("sources", []))
 
 def interactivo(modo_holmes):
     last_sources = []
@@ -29,11 +71,12 @@ def interactivo(modo_holmes):
                 print("No hay fuentes para mostrar.")
             continue
         question = holmes_prompt(user_input) if modo_holmes else user_input
-        url = "http://localhost:8000/ask"
-        payload = {"question": question}
-        headers = {"Content-Type": "application/json"}
         try:
-            response = requests.post(url, json=payload, headers=headers)
+            response = requests.post(
+                f"{BASE_URL}/ask",
+                json={"question": question, "modo": "auto", "nombre": None},
+                timeout=180
+            )
             response.raise_for_status()
             data = response.json()
             print(data.get('answer'), "\n")
@@ -44,36 +87,27 @@ def interactivo(modo_holmes):
             print(f"Error consultando la API: {e}")
 
 def main():
-    args = sys.argv[1:]
-    modo_holmes = False
-    if "--holmes" in args:
-        modo_holmes = True
-        args.remove("--holmes")
+    parser = argparse.ArgumentParser(description="CLI para LoreChat Holmes")
+    parser.add_argument("question", nargs="*", help="Pregunta o prompt")
+    parser.add_argument("--modo", default="auto", choices=["auto", "factual", "cuento"], help="Modo de respuesta")
+    parser.add_argument("--nombre", default=None, help="Tu nombre (para que Holmes no te llame Watson)")
+    parser.add_argument("--holmes", action="store_true", help="Prepend prompt de Holmes a la pregunta")
+    parser.add_argument("--story", action="store_true", help="Usar /generate-story en lugar de /ask")
+    parser.add_argument("--pdf", action="store_true", help="Con --story, genera PDF en vez de texto")
 
-    if not args:
-        interactivo(modo_holmes)
-        return
-
-    question = " ".join(args)
-    if modo_holmes:
+    args = parser.parse_args()
+    question = " ".join(args.question)
+    if args.holmes and question:
         question = holmes_prompt(question)
 
-    url = "http://localhost:8000/ask"
-    payload = {"question": question}
-    headers = {"Content-Type": "application/json"}
+    if not question:
+        interactivo(modo_holmes=args.holmes)
+        return
 
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        response.raise_for_status()
-        data = response.json()
-        print(data.get('answer'), "\n")
-        if data.get("sources"):
-            print("📚 Fuentes consultadas:")
-            for src in data.get("sources", []):
-                print(f"• {src['source']} (chunk {src['chunk_id']})")
-                print(f"  ↳ {src['preview']}\n")
-    except Exception as e:
-        print(f"Error consultando la API: {e}")
+    if args.story:
+        story(question, nombre=args.nombre, formato="pdf" if args.pdf else "chat")
+    else:
+        ask(question, modo=args.modo, nombre=args.nombre)
 
 if __name__ == "__main__":
     main()

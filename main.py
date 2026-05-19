@@ -192,47 +192,28 @@ async def ask(request: AskRequest):
     try:
         t0 = time.time()
 
-        logger.info(f"⏳ [1] Construyendo chain (modo={modo_efectivo}, max_tokens={'4000' if modo_efectivo == 'cuento' else '1024'})...")
         chain = app.state.qa_service.build_chain(modo_efectivo, request.nombre)
-        t_chain = time.time()
-        logger.info(f"✅ [1] Chain lista en {t_chain - t0:.2f}s")
-
-        logger.info(f"⏳ [2] Recuperando docs de pgvector (k=10)...")
-        retriever = app.state.qa_service._retriever
-        loop = asyncio.get_event_loop()
-        docs_retrieved = await loop.run_in_executor(
-            None, lambda: retriever.invoke(request.question)
-        )
-        t_retrieval = time.time()
-        logger.info(f"✅ [2] {len(docs_retrieved)} docs recuperados en {t_retrieval - t_chain:.2f}s")
-
-        # Estimar tamaño de contexto enviado al LLM
-        context_chars = sum(len(d.page_content) for d in docs_retrieved)
-        question_chars = len(request.question)
-        logger.info(f"📏 Contexto: {context_chars} chars docs + {question_chars} chars pregunta ≈ {(context_chars + question_chars) // 4} tokens estimados")
-
-        logger.info(f"⏳ [3] Llamando al LLM (Claude)...")
         result = chain.invoke({"query": request.question})
         t_llm = time.time()
         answer = result["result"]
-        logger.info(f"✅ [3] LLM respondió en {t_llm - t_retrieval:.2f}s | respuesta: {len(answer)} chars ≈ {len(answer) // 4} tokens")
-
         docs_sorted = result.get("source_documents", [])
+
+        logger.info(f"✅ LLM: {t_llm - t0:.2f}s | {len(docs_sorted)} chunks recuperados")
 
         # Post-procesar con spaCy solo en modo factual
         if modo_efectivo != "cuento":
-            logger.info(f"⏳ [4] Post-procesando con spaCy...")
             import spacy
             try:
                 nlp = spacy.load("es_core_news_sm")
                 doc = nlp(answer)
                 sentences = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
+                logger.info(f"[spaCy] Oraciones detectadas: {sentences}")
                 paragraphs = []
                 for i in range(0, len(sentences), 4):
                     paragraphs.append(" ".join(sentences[i:i+4]))
+                logger.info(f"[spaCy] Párrafos generados: {paragraphs}")
                 answer = "\n\n".join(paragraphs)
-                t_spacy = time.time()
-                logger.info(f"✅ [4] spaCy en {t_spacy - t_llm:.2f}s")
+                logger.info(f"[spaCy] Respuesta final (con \\n\\n): {repr(answer)}")
             except Exception as e:
                 logger.error(f"spaCy error: {e}")
 
@@ -249,7 +230,9 @@ async def ask(request: AskRequest):
                 })
 
         t_total = time.time()
-        logger.info(f"🏁 TOTAL: {t_total - t0:.2f}s | chain={t_chain-t0:.2f}s | retrieval={t_retrieval-t_chain:.2f}s | llm={t_llm-t_retrieval:.2f}s")
+        logger.info(f"🏁 TOTAL: {t_total - t0:.2f}s")
+        for src in sources:
+            logger.info(f"• {src['source']} (chunk {src['chunk_id']})\n  ↳ {src['preview']}")
         return {
             "answer": answer,
             "sources": sources,
@@ -413,14 +396,33 @@ async def generate_story(request: StoryRequest):
         None, lambda: chain.invoke({"query": request.prompt})
     )
     story_text = story_result["result"]
+    story_docs = story_result.get("source_documents", [])
     t1 = time.time()
-    logger.info(f"✅ [1] Cuento: {len(story_text)} chars ≈ {len(story_text)//4} tokens | {t1-t0:.1f}s")
+    logger.info(f"✅ [1] Cuento: {len(story_text)} chars ≈ {len(story_text)//4} tokens | {t1-t0:.1f}s | {len(story_docs)} chunks recuperados")
+    logger.info(f"── Cuento generado: '{story_text[:300].replace(chr(10), ' ')}...'")
+    for doc in story_docs:
+        src = doc.metadata.get("source", "?")
+        cid = doc.metadata.get("chunk_id", "?")
+        preview = doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
+        logger.info(f"• {src} (chunk {cid})\n  ↳ {preview}")
 
     # Modo chat: devolver JSON sin PDF
     if request.formato == "chat":
         logger.info("📨 Formato chat — devolviendo JSON")
+        seen = set()
+        sources = []
+        for doc in story_docs:
+            cid = doc.metadata.get("chunk_id")
+            if cid not in seen:
+                seen.add(cid)
+                sources.append({
+                    "source": doc.metadata.get("source"),
+                    "chunk_id": cid,
+                    "preview": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
+                })
         return {
             "story": story_text,
+            "sources": sources,
             "modo": "cuento",
             "llm_provider": qa_service.current_provider,
         }

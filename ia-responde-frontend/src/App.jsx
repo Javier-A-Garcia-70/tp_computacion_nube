@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 
 const INTRO = `🔍 **LoreChat Holmes**
@@ -8,6 +8,42 @@ const INTRO = `🔍 **LoreChat Holmes**
 Bienvenido a Baker Street 221B. Sherlock Holmes responde tus preguntas basándose en el corpus completo de Arthur Conan Doyle.
 
 Podés hacerle preguntas sobre sus casos, métodos deductivos y vida en la época victoriana. También podés pedirle que escriba un cuento de misterio con los personajes que quieras.`;
+
+function SourcesList({ sources }) {
+  const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(null);
+
+  return (
+    <div className="mt-3 border-t border-gray-700 pt-2">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="text-xs text-amber-500 hover:text-amber-300 font-semibold"
+      >
+        {open ? "▾" : "▸"} {sources.length} fragmento{sources.length > 1 ? "s" : ""} del corpus consultado{sources.length > 1 ? "s" : ""}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-1">
+          {sources.map((s, i) => (
+            <div key={i} className="text-xs">
+              <button
+                onClick={() => setExpanded(expanded === i ? null : i)}
+                className="text-left text-gray-400 hover:text-gray-200 w-full"
+              >
+                {expanded === i ? "▾" : "▸"} <span className="text-amber-600">{s.source || "fuente desconocida"}</span>
+                {s.chunk_id && <span className="text-gray-600"> · chunk {s.chunk_id}</span>}
+              </button>
+              {expanded === i && (
+                <div className="mt-1 ml-3 p-2 bg-gray-900 rounded text-gray-400 leading-relaxed">
+                  {s.preview}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function App() {
   const [messages, setMessages] = useState([{ role: "info", text: INTRO }]);
@@ -85,10 +121,8 @@ function App() {
                         <p key={idx} style={{ marginBottom: "1.2em" }}>{p}</p>
                       ))}
                   </div>
-                  {msg.sources.length > 0 && (
-                    <div className="mt-3 text-xs text-gray-500 italic">
-                      {msg.sources.length} fuente{msg.sources.length > 1 ? "s" : ""} consultada{msg.sources.length > 1 ? "s" : ""}
-                    </div>
+                  {msg.sources && msg.sources.length > 0 && (
+                    <SourcesList sources={msg.sources} />
                   )}
                 </div>
               ) : msg.role === "info" ? (
