@@ -41,7 +41,8 @@ desktop.ini
 *.swo
 
 # PDFs (documentos fuente, no subir)
-pdfs/
+pdfs/*
+!pdfs/.gitkeep
 
 # Deploy
 .vercel
