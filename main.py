@@ -1,9 +1,11 @@
 import os
 import logging
 from contextlib import asynccontextmanager
+from typing import Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
 from langchain_anthropic import ChatAnthropic
 from langchain_voyageai import VoyageAIEmbeddings
 from langchain_postgres import PGVector
@@ -14,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 class AskRequest(BaseModel):
     question: str
-    modo: str = "auto"  # "auto", "factual", "cuento"
+    modo: str = "auto"       # "auto", "factual", "cuento"
+    nombre: Optional[str] = None
 
 KEYWORDS_CUENTO = {"escribe", "crea", "inventa", "cuento", "historia", "relato", "genera", "imagina", "narra", "redacta", "compone"}
 
@@ -24,16 +27,45 @@ def _detect_modo(question: str) -> str:
         return "cuento"
     return "factual"
 
+def _build_prompt(modo: str, nombre: Optional[str]) -> PromptTemplate:
+    nombre_linea = (
+        f"El interlocutor se llama {nombre}. Dirígete a él por ese nombre."
+        if nombre
+        else "No conoces el nombre del interlocutor. NO lo llames Watson ni asumas ningún nombre. Si querés dirigirte a él, usá 'usted' o 'mi estimado visitante'."
+    )
+
+    if modo == "cuento":
+        template = (
+            "Sos Sherlock Holmes, el detective de Baker Street 221B. "
+            "Escribí una historia en primera persona con tu estilo victoriano, deductivo y preciso. "
+            "Usá los documentos como fuente de personajes, lugares y casos reales de tu historia. "
+            f"{nombre_linea} "
+            "La historia debe ser larga, detallada y envolvente.\n\n"
+            "Documentos de referencia:\n{context}\n\n"
+            "Solicitud: {question}\n\n"
+            "Historia:"
+        )
+    else:
+        template = (
+            "Sos Sherlock Holmes, el detective de Baker Street 221B. "
+            "Respondé en primera persona con tu estilo deductivo, preciso y ocasionalmente arrogante. "
+            f"{nombre_linea} "
+            "Basá tu respuesta en los documentos. Sé conciso y directo.\n\n"
+            "Documentos de referencia:\n{context}\n\n"
+            "Pregunta: {question}\n\n"
+            "Respuesta:"
+        )
+
+    return PromptTemplate(template=template, input_variables=["context", "question"])
+
+
 class MultiCloudQAService:
-    """Servicio QA con LLM cloud + embeddings locales"""
-    
     def __init__(self, config: CloudConfig):
         self.config = config
         self.current_provider = None
         self.current_embedding_provider = None
-        self.qa_chain_factual = None
-        self.qa_chain_cuento = None
-        
+        self._retriever = None
+
     def get_embeddings(self):
         embeddings = VoyageAIEmbeddings(
             voyage_api_key=self.config.voyage_api_key,
@@ -42,47 +74,45 @@ class MultiCloudQAService:
         self.current_embedding_provider = 'voyage'
         logger.info("✅ Voyage AI embeddings configurados")
         return embeddings
-    
+
     def get_llm(self, temperature: float = 0.1, max_tokens: int = 1024):
-        llm = ChatAnthropic(
+        self.current_provider = 'anthropic'
+        return ChatAnthropic(
             api_key=self.config.anthropic_api_key,
             model="claude-sonnet-4-6",
             max_tokens=max_tokens,
             temperature=temperature
         )
-        self.current_provider = 'anthropic'
-        return llm
-    
+
     def initialize_qa_chain(self):
-        """Inicializa cadena QA"""
         try:
             embeddings = self.get_embeddings()
-            
             db = PGVector(
                 embeddings=embeddings,
                 collection_name="lorechat_holmes",
                 connection=self.config.database_url,
             )
-            retriever = db.as_retriever(search_kwargs={"k": 10})
-            
-            self.qa_chain_factual = RetrievalQA.from_chain_type(
-                llm=self.get_llm(temperature=0.1, max_tokens=1024),
-                chain_type="stuff",
-                retriever=retriever,
-                return_source_documents=True
-            )
-            self.qa_chain_cuento = RetrievalQA.from_chain_type(
-                llm=self.get_llm(temperature=0.85, max_tokens=8000),
-                chain_type="stuff",
-                retriever=retriever,
-                return_source_documents=True
-            )
+            self._retriever = db.as_retriever(search_kwargs={"k": 10})
+            # Forzar que current_provider quede seteado
+            self.get_llm()
             logger.info("✅ Claude (Anthropic) configurado")
             logger.info(f"🚀 Sistema listo — Embeddings: {self.current_embedding_provider.upper()} | LLM: {self.current_provider.upper()}")
-            
         except Exception as e:
             logger.error(f"Error inicializando sistema: {e}")
             raise
+
+    def build_chain(self, modo: str, nombre: Optional[str]) -> RetrievalQA:
+        temperature = 0.85 if modo == "cuento" else 0.1
+        max_tokens = 10000 if modo == "cuento" else 1024
+        prompt = _build_prompt(modo, nombre)
+        return RetrievalQA.from_chain_type(
+            llm=self.get_llm(temperature=temperature, max_tokens=max_tokens),
+            chain_type="stuff",
+            retriever=self._retriever,
+            return_source_documents=True,
+            chain_type_kwargs={"prompt": prompt}
+        )
+
 
 # Configuración global
 config = CloudConfig()
@@ -90,7 +120,6 @@ qa_service = MultiCloudQAService(config)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     try:
         qa_service.initialize_qa_chain()
         app.state.qa_service = qa_service
@@ -99,12 +128,11 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ Error al iniciar: {e}")
         raise
     yield
-    # Shutdown
     logger.info("🔄 Cerrando API")
 
 app = FastAPI(
-    title="RAG Local Multi-Cloud",
-    description="AWS/Azure LLM + Embeddings Locales",
+    title="LoreChat Holmes",
+    description="RAG sobre el corpus de Sherlock Holmes",
     lifespan=lifespan
 )
 
@@ -124,7 +152,6 @@ app.add_middleware(
 
 @app.get("/health")
 async def health_check():
-    """Estado del sistema"""
     return {
         "status": "healthy",
         "llm_provider": qa_service.current_provider,
@@ -134,45 +161,38 @@ async def health_check():
 
 @app.post("/ask")
 async def ask(request: AskRequest):
-    """Hacer pregunta a los documentos"""
     logger.info(f"Pregunta recibida: {request.question}")
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="La pregunta no puede estar vacía")
 
     modo_efectivo = request.modo if request.modo != "auto" else _detect_modo(request.question)
-    chain = (app.state.qa_service.qa_chain_cuento
-             if modo_efectivo == "cuento"
-             else app.state.qa_service.qa_chain_factual)
-    logger.info(f"Modo: {modo_efectivo}")
+    logger.info(f"Modo: {modo_efectivo} | Nombre: {request.nombre or '(desconocido)'}")
 
     import time
     try:
+        chain = app.state.qa_service.build_chain(modo_efectivo, request.nombre)
+
         t0 = time.time()
         result = chain.invoke({"query": request.question})
         t1 = time.time()
+
         docs_sorted = result.get("source_documents", [])
         answer = result["result"]
-        t2 = time.time()
-        # Post-procesar: separar en párrafos reales usando spaCy (cada 3 oraciones)
-        import spacy
-        try:
-            nlp = spacy.load("es_core_news_sm")
-            doc = nlp(answer)
-            sentences = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
-            logger.info(f"[spaCy] Oraciones detectadas: {sentences}")
-            # Agrupar en párrafos de al menos 4 oraciones cada uno
-            paragraphs = []
-            min_sent_per_paragraph = 4
-            for i in range(0, len(sentences), min_sent_per_paragraph):
-                paragraphs.append(" ".join(sentences[i:i+min_sent_per_paragraph]))
-            logger.info(f"[spaCy] Párrafos generados: {paragraphs}")
-            answer = "\n\n".join(paragraphs)
-            logger.info(f"[spaCy] Respuesta final (con \\n\\n): {repr(answer)}")
-        except Exception as e:
-            # Si spaCy falla, dejar el texto como está
-            logger.error(f"spaCy error: {e}")
-        t3 = time.time()
-        # Permitir múltiples chunks del mismo libro, pero sin duplicar chunk_id
+
+        # Post-procesar con spaCy solo en modo factual (cuento ya viene bien formateado)
+        if modo_efectivo != "cuento":
+            import spacy
+            try:
+                nlp = spacy.load("es_core_news_sm")
+                doc = nlp(answer)
+                sentences = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
+                paragraphs = []
+                for i in range(0, len(sentences), 4):
+                    paragraphs.append(" ".join(sentences[i:i+4]))
+                answer = "\n\n".join(paragraphs)
+            except Exception as e:
+                logger.error(f"spaCy error: {e}")
+
         seen_chunks = set()
         sources = []
         for doc in docs_sorted:
@@ -184,8 +204,9 @@ async def ask(request: AskRequest):
                     "chunk_id": chunk_id,
                     "preview": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
                 })
-        logger.info(f"⏱️ Tiempos: Retrieval+LLM: {t1-t0:.2f}s | Post-proc: {t3-t2:.2f}s | Total: {t3-t0:.2f}s")
-        logger.info(f"✅ Pregunta respondida - LLM: {qa_service.current_provider.upper()}, Embeddings: {qa_service.current_embedding_provider.upper()}")
+
+        t2 = time.time()
+        logger.info(f"⏱️ LLM: {t1-t0:.2f}s | Total: {t2-t0:.2f}s")
         return {
             "answer": answer,
             "sources": sources,
@@ -196,4 +217,3 @@ async def ask(request: AskRequest):
     except Exception as e:
         logger.error(f"❌ Error: {e}")
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
-
