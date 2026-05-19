@@ -1,0 +1,31 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-dotenv==1.0.0
+
+# LangChain
+langchain
+langchain-community
+langchain-anthropic
+langchain-voyageai
+langchain-postgres
+
+# Anthropic
+anthropic
+
+# Voyage AI (embeddings)
+voyageai
+
+# PDF processing
+PyMuPDF==1.23.8
+
+# PostgreSQL + pgvector
+psycopg2-binary
+pgvector
+
+# Utils
+numpy==1.24.3
+pydantic==1.10.13
+requests
+
+# NLP para procesamiento de texto en español
+spacy==3.7.2

@@ -1,0 +1,10 @@
+venv/
+chroma_db/
+pdfs/
+__pycache__/
+.env
+*.pyc
+chunks.json
+.git/
+ia-responde-frontend/
+node_modules/
