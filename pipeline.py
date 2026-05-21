@@ -42,12 +42,6 @@ def main():
             backend_proc.terminate()
             return
 
-        # 5. Ejecutar clasifica_llm.py (clasifica los chunks)
-        run_script("clasifica_llm.py")
-
-        # 6. (Opcional) Volver a ejecutar build_db.py para actualizar chroma_db con los tipos
-        run_script("build_db.py")
-
     finally:
         print("Deteniendo backend FastAPI...")
         if backend_proc.poll() is None:

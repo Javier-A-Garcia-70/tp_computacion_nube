@@ -1,3 +1,46 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* LoreChat responsive layout */
+.lorechat-outer {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  background: #C8BFA8;
+  font-family: 'Inter', sans-serif;
+}
+
+.lorechat-container {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Desktop: chat ancho normal, sin frame de celular */
+@media (min-width: 640px) {
+  .lorechat-outer {
+    padding: 0;
+    background: #EDE5D0;
+  }
+  .lorechat-container {
+    max-width: 760px;
+    height: 100vh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+/* Mobile: frame tipo celular con fondo beige oscuro */
+@media (max-width: 639px) {
+  .lorechat-outer {
+    padding: 0;
+  }
+  .lorechat-container {
+    max-width: 100%;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}

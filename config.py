@@ -1,14 +1,17 @@
 import os
 import logging
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+_DOTENV_PATH = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=_DOTENV_PATH)
 logger = logging.getLogger(__name__)
 
 class CloudConfig:
     """Configuración LoreChat — Anthropic + Voyage AI + pgvector"""
 
     def __init__(self):
+        load_dotenv(dotenv_path=_DOTENV_PATH, override=True)
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
         self.voyage_api_key = os.getenv("VOYAGE_API_KEY")
         self.voyage_model = os.getenv("VOYAGE_MODEL", "voyage-3")

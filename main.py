@@ -6,7 +6,8 @@ import os
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Optional
+from datetime import datetime
+from typing import List, Optional
 import httpx
 import anthropic as anthropic_sdk
 from fastapi import FastAPI, HTTPException
@@ -27,10 +28,23 @@ from config import CloudConfig
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+try:
+    import spacy
+    _nlp = spacy.load("es_core_news_sm")
+    logger.info("✅ spaCy cargado")
+except Exception as _spacy_err:
+    _nlp = None
+    logger.warning(f"spaCy no disponible: {_spacy_err}")
+
+class HistoryMessage(BaseModel):
+    role: str   # "user" | "holmes"
+    content: str
+
 class AskRequest(BaseModel):
     question: str
     modo: str = "auto"       # "auto", "factual", "cuento"
     nombre: Optional[str] = None
+    history: List[HistoryMessage] = []
 
 class StoryRequest(BaseModel):
     prompt: str
@@ -169,6 +183,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 @app.get("/health")
@@ -193,7 +208,17 @@ async def ask(request: AskRequest):
         t0 = time.time()
 
         chain = app.state.qa_service.build_chain(modo_efectivo, request.nombre)
-        result = chain.invoke({"query": request.question})
+
+        query = request.question
+        if request.history:
+            window = request.history[-6:]
+            history_text = "Conversación previa:\n"
+            for msg in window:
+                role = "Usuario" if msg.role == "user" else "Holmes"
+                history_text += f"{role}: {msg.content}\n"
+            query = history_text + "\nPregunta actual: " + request.question
+
+        result = chain.invoke({"query": query})
         t_llm = time.time()
         answer = result["result"]
         docs_sorted = result.get("source_documents", [])
@@ -201,12 +226,10 @@ async def ask(request: AskRequest):
         logger.info(f"✅ LLM: {t_llm - t0:.2f}s | {len(docs_sorted)} chunks recuperados")
 
         # Post-procesar con spaCy solo en modo factual
-        if modo_efectivo != "cuento":
-            import spacy
+        if modo_efectivo != "cuento" and _nlp is not None:
             try:
-                nlp = spacy.load("es_core_news_sm")
-                doc = nlp(answer)
-                sentences = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
+                spacy_doc = _nlp(answer)
+                sentences = [sent.text.strip() for sent in spacy_doc.sents if sent.text.strip()]
                 logger.info(f"[spaCy] Oraciones detectadas: {sentences}")
                 paragraphs = []
                 for i in range(0, len(sentences), 4):
@@ -247,25 +270,51 @@ async def ask(request: AskRequest):
 
 # ─── /generate-story helpers ──────────────────────────────────────────────────
 
+def _extract_title(story_text: str) -> str:
+    """Extrae el título del cuento desde el texto generado por Claude."""
+    for line in story_text.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        # Markdown h1: # Título
+        if line.startswith('# '):
+            return line[2:].strip()
+        # Markdown h2: ## Título
+        if line.startswith('## '):
+            return line[3:].strip()
+        # Negrita sola en línea: **Título**
+        m = re.match(r'^\*\*(.+?)\*\*$', line)
+        if m:
+            return m.group(1).strip()
+        # Primera línea no vacía como fallback
+        return line[:80]
+    return "Un caso de Sherlock Holmes"
+
 async def _generate_story_meta(story_text: str, api_key: str) -> dict:
-    """Una sola llamada a Claude: sinopsis + 4 prompts de imagen."""
+    """Una sola llamada a Claude: sinopsis + 3 prompts de imagen contextuales en inglés."""
     client = anthropic_sdk.AsyncAnthropic(api_key=api_key)
-    excerpt = story_text[:4000]
+    title = _extract_title(story_text)
+    excerpt = story_text[:6000]
+
     msg = await client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=1500,
+        max_tokens=1800,
         messages=[{
             "role": "user",
             "content": (
-                f"Basándote en este cuento de Sherlock Holmes:\n\n{excerpt}\n\n"
-                "Generá en JSON puro sin markdown:\n"
-                '{"synopsis": "sinopsis atractiva para contratapa, 120 palabras, sin spoilers del final", '
-                '"image_prompts": {'
-                '"cover": "dramatic Victorian illustration for book cover, Sherlock Holmes and a child, detailed, atmospheric, pencil sketch style",'
-                '"internal_1": "Victorian London scene from the story, detailed pencil illustration",'
-                '"internal_2": "key mystery scene from the story, Victorian pencil illustration",'
-                '"back": "Baker Street 221B exterior, foggy Victorian London, atmospheric pencil illustration"'
-                '}}'
+                f'You are illustrating a Sherlock Holmes story titled: "{title}"\n\n'
+                f"Story content:\n{excerpt}\n\n"
+                "Generate a JSON object (no markdown, no code blocks) with exactly these keys:\n"
+                "1. \"synopsis\": 100-120 word Spanish back-cover summary. Intriguing but NO spoilers of the ending.\n"
+                "2. \"cover_prompt\": English prompt for a FULL-PAGE book cover illustration. "
+                "Style: Victorian steel engraving, Gustave Doré lithograph, intricate crosshatching, monochrome ink, "
+                "19th century book illustration. Describe a dramatic scene SPECIFIC to this story's central mystery. "
+                "Include Sherlock Holmes. No color, no modern elements, no text.\n"
+                "3. \"chapter1_prompt\": English prompt for a LANDSCAPE illustration at the end of Chapter 1. "
+                "Same Victorian engraving style. Describe a SPECIFIC scene from the FIRST chapter of this story.\n"
+                "4. \"chapter2_prompt\": English prompt for a LANDSCAPE illustration at the end of Chapter 2. "
+                "Same Victorian engraving style. Describe a SPECIFIC scene from the SECOND chapter of this story.\n\n"
+                'Return only valid JSON: {"synopsis": "...", "cover_prompt": "...", "chapter1_prompt": "...", "chapter2_prompt": "..."}'
             )
         }]
     )
@@ -273,27 +322,39 @@ async def _generate_story_meta(story_text: str, api_key: str) -> dict:
     return json.loads(raw)
 
 
-async def _generate_image_leonardo(prompt: str, api_key: str) -> bytes:
-    """Submite job a Leonardo AI y espera el resultado (polling)."""
+async def _generate_image_leonardo(
+    prompt: str, api_key: str,
+    width: int = 768, height: int = 768
+) -> bytes:
+    """Submite job a Leonardo AI (Phoenix 1.0) y espera el resultado (polling)."""
     if not api_key:
         raise ValueError("LEONARDO_API_KEY no configurada")
 
-    async with httpx.AsyncClient(timeout=120) as client:
+    # Flux Schnell — más rápido y barato, "Unlimited" en la plataforma
+    MODEL_ID = "1dd50843-d653-4516-a8e3-f0238ee453ff"
+    NEGATIVE = (
+        "color, colorful, modern, digital art, photography, photo, "
+        "anime, cartoon, 3D render, watercolor, oil painting, blurry, "
+        "low quality, deformed"
+    )
+
+    async with httpx.AsyncClient(timeout=180) as client:
         resp = await client.post(
             "https://cloud.leonardo.ai/api/rest/v1/generations",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
                 "prompt": prompt,
-                "modelId": "b24e16ff-06e3-43eb-8d33-4416c2d75876",
-                "width": 768,
-                "height": 768,
+                "negative_prompt": NEGATIVE,
+                "modelId": MODEL_ID,
+                "width": width,
+                "height": height,
                 "num_images": 1,
             }
         )
         resp.raise_for_status()
         generation_id = resp.json()["sdGenerationJob"]["generationId"]
 
-        for _ in range(30):
+        for _ in range(40):   # hasta ~2 min
             await asyncio.sleep(3)
             poll = await client.get(
                 f"https://cloud.leonardo.ai/api/rest/v1/generations/{generation_id}",
@@ -309,20 +370,39 @@ async def _generate_image_leonardo(prompt: str, api_key: str) -> bytes:
 
 
 def _build_pdf(story_text: str, synopsis: str, title: str, nombre: Optional[str],
-               cover_img, internal_1_img, internal_2_img, back_img) -> bytes:
+               cover_img, chapter1_img, chapter2_img) -> bytes:
     """Arma el PDF con ReportLab."""
     buffer = io.BytesIO()
     page_w = A4[0] - 5 * cm
+    BROWN       = colors.HexColor('#3a2810')
+    BROWN_MID   = colors.HexColor('#5a4a2a')
+    BROWN_LIGHT = colors.HexColor('#8a7a5a')
 
     doc = SimpleDocTemplate(buffer, pagesize=A4,
                             leftMargin=2.5*cm, rightMargin=2.5*cm,
                             topMargin=2*cm, bottomMargin=2*cm)
 
     styles = getSampleStyleSheet()
-    title_st   = ParagraphStyle('T', parent=styles['Title'],  fontSize=22, alignment=1, spaceAfter=14)
-    sub_st     = ParagraphStyle('S', parent=styles['Normal'], fontSize=12, alignment=1, spaceAfter=8)
-    body_st    = ParagraphStyle('B', parent=styles['Normal'], fontSize=11, leading=17, spaceAfter=8)
-    synopsis_st= ParagraphStyle('Y', parent=styles['Normal'], fontSize=10, leading=14, alignment=4)
+    title_st    = ParagraphStyle('T',  parent=styles['Title'],  fontSize=24, alignment=1,
+                                 spaceAfter=8,  textColor=BROWN,       fontName='Times-Bold')
+    subtitle_st = ParagraphStyle('S',  parent=styles['Normal'], fontSize=12, alignment=1,
+                                 spaceAfter=6,  textColor=BROWN_MID,   fontName='Times-Italic')
+    chapter_st  = ParagraphStyle('CH', parent=styles['Normal'], fontSize=14, alignment=1,
+                                 spaceBefore=18, spaceAfter=12, textColor=BROWN, fontName='Times-Bold')
+    body_st     = ParagraphStyle('B',  parent=styles['Normal'], fontSize=11, leading=17,
+                                 spaceAfter=8,  fontName='Times-Roman')
+    synopsis_st = ParagraphStyle('Y',  parent=styles['Normal'], fontSize=10, leading=15,
+                                 alignment=4,   textColor=BROWN,       fontName='Times-Roman')
+    back_hdr_st = ParagraphStyle('BH', parent=styles['Normal'], fontSize=15, alignment=1,
+                                 spaceAfter=10, textColor=BROWN,       fontName='Times-BoldItalic')
+    footer_st   = ParagraphStyle('F',  parent=styles['Normal'], fontSize=9,  alignment=1,
+                                 textColor=BROWN_LIGHT, fontName='Times-Italic')
+
+    chapter_re = re.compile(
+        r'^(#{1,3}\s+|\*\*(parte|cap[íi]tulo|chapter|part)\b.*?\*\*'
+        r'|(parte|cap[íi]tulo|chapter|part)\s+[ivxIVX\d]+)',
+        re.IGNORECASE
+    )
 
     def make_img(img_bytes, w, h):
         if not img_bytes:
@@ -332,48 +412,75 @@ def _build_pdf(story_text: str, synopsis: str, title: str, nombre: Optional[str]
         except Exception:
             return None
 
+    # Detectar fines de capítulo para colocar ilustraciones
+    paras = [p.strip() for p in story_text.split('\n\n') if p.strip()]
+    chapter_starts = [i for i, p in enumerate(paras) if chapter_re.match(p) and i > 0]
+
+    if len(chapter_starts) >= 2:
+        ch1_end = chapter_starts[1] - 1
+        ch2_end = chapter_starts[2] - 1 if len(chapter_starts) >= 3 else len(paras) - 1
+    elif len(chapter_starts) == 1:
+        ch1_end = chapter_starts[0] - 1
+        ch2_end = len(paras) - 1
+    else:
+        # Sin encabezados detectados — fallback a 1/3 y 2/3
+        third = max(1, len(paras) // 3)
+        ch1_end = third - 1
+        ch2_end = 2 * third - 1
+
     flow = []
 
     # === TAPA ===
-    flow.append(Spacer(1, 1.5*cm))
-    img = make_img(cover_img, page_w, 13*cm)
+    img = make_img(cover_img, page_w, 16*cm)
     if img:
+        flow.append(Spacer(1, 0.3*cm))
         flow.append(img)
         flow.append(Spacer(1, 0.5*cm))
+        flow.append(HRFlowable(width="70%", thickness=2, color=BROWN_MID))
+        flow.append(Spacer(1, 0.4*cm))
+    else:
+        flow.append(Spacer(1, 4*cm))
     flow.append(Paragraph(title[:80], title_st))
-    flow.append(Paragraph("Un caso de Sherlock Holmes", sub_st))
+    flow.append(Paragraph("Un caso de Sherlock Holmes", subtitle_st))
     if nombre:
-        flow.append(Paragraph(f"Protagonista: {nombre}", sub_st))
+        flow.append(Paragraph(f"con {nombre}", subtitle_st))
+    flow.append(HRFlowable(width="40%", thickness=1, color=BROWN_LIGHT))
     flow.append(PageBreak())
 
     # === TEXTO CON ILUSTRACIONES ===
-    paras = [p.strip() for p in story_text.split('\n\n') if p.strip()]
-    third = max(1, len(paras) // 3)
-
     for i, para in enumerate(paras):
-        flow.append(Paragraph(para, body_st))
+        if chapter_re.match(para):
+            clean = re.sub(r'^#{1,3}\s+|\*\*', '', para).strip()
+            flow.append(Paragraph(clean, chapter_st))
+        else:
+            flow.append(Paragraph(para, body_st))
 
-        if i == third - 1:
-            img = make_img(internal_1_img, 10*cm, 8*cm)
+        if i == ch1_end:
+            img = make_img(chapter1_img, 13*cm, 7*cm)
             if img:
-                flow += [Spacer(1, 0.3*cm), img, Spacer(1, 0.3*cm)]
+                flow += [Spacer(1, 0.6*cm), img, Spacer(1, 0.6*cm)]
 
-        if i == 2 * third - 1:
-            img = make_img(internal_2_img, 10*cm, 8*cm)
+        if i == ch2_end and ch2_end != ch1_end:
+            img = make_img(chapter2_img, 13*cm, 7*cm)
             if img:
-                flow += [Spacer(1, 0.3*cm), img, Spacer(1, 0.3*cm)]
+                flow += [Spacer(1, 0.6*cm), img, Spacer(1, 0.6*cm)]
 
     flow.append(PageBreak())
 
     # === CONTRATAPA ===
-    img = make_img(back_img, page_w, 8*cm)
-    if img:
-        flow.append(img)
-        flow.append(Spacer(1, 0.5*cm))
-    flow.append(HRFlowable(width="100%", thickness=1, color=colors.darkgrey))
-    flow.append(Spacer(1, 0.3*cm))
-    flow.append(Paragraph("Sinopsis", sub_st))
-    flow.append(Paragraph(synopsis, synopsis_st))
+    flow.append(Spacer(1, 2.5*cm))
+    flow.append(HRFlowable(width="55%", thickness=2.5, color=BROWN_MID))
+    flow.append(Spacer(1, 0.6*cm))
+    flow.append(Paragraph("Sinopsis", back_hdr_st))
+    flow.append(Spacer(1, 0.4*cm))
+    flow.append(HRFlowable(width="55%", thickness=1, color=BROWN_LIGHT))
+    flow.append(Spacer(1, 0.6*cm))
+    if synopsis:
+        flow.append(Paragraph(synopsis, synopsis_st))
+    flow.append(Spacer(1, 1.5*cm))
+    flow.append(HRFlowable(width="35%", thickness=1, color=BROWN_LIGHT))
+    flow.append(Spacer(1, 0.4*cm))
+    flow.append(Paragraph("Sherlock Holmes  ·  Baker Street 221B  ·  Londres", footer_st))
 
     doc.build(flow)
     return buffer.getvalue()
@@ -387,7 +494,7 @@ async def generate_story(request: StoryRequest):
         raise HTTPException(status_code=400, detail="El prompt no puede estar vacío")
 
     t0 = time.time()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     # 1. Generar texto del cuento (RetrievalQA es sync → executor)
     logger.info(f"⏳ [1] Generando texto del cuento...")
@@ -428,29 +535,33 @@ async def generate_story(request: StoryRequest):
         }
 
     # 2 & 3. Sinopsis e imágenes — solo si Leonardo está configurado
+    story_title = _extract_title(story_text)
+    logger.info(f"📖 Título detectado: '{story_title}'")
     t2 = t1
     synopsis = ""
-    images = [None, None, None, None]
+    cover_img, ch1_img, ch2_img = None, None, None
     if config.leonardo_api_key:
         logger.info(f"⏳ [2] Generando sinopsis y prompts de imagen (Claude)...")
         meta = await _generate_story_meta(story_text, config.anthropic_api_key)
         t2 = time.time()
         logger.info(f"✅ [2] Meta generada en {t2-t1:.1f}s")
+        logger.info(f"   cover: {meta.get('cover_prompt','')[:80]}")
+        logger.info(f"   ch1:   {meta.get('chapter1_prompt','')[:80]}")
+        logger.info(f"   ch2:   {meta.get('chapter2_prompt','')[:80]}")
 
-        logger.info(f"⏳ [3] Generando imágenes con Leonardo AI...")
-        prompts_img = [
-            meta["image_prompts"]["cover"],
-            meta["image_prompts"]["internal_1"],
-            meta["image_prompts"]["internal_2"],
-            meta["image_prompts"]["back"],
-        ]
+        logger.info(f"⏳ [3] Generando 3 imágenes con Leonardo Phoenix...")
         images_raw = await asyncio.gather(
-            *[_generate_image_leonardo(p, config.leonardo_api_key) for p in prompts_img],
+            _generate_image_leonardo(meta["cover_prompt"],    config.leonardo_api_key, width=768,  height=1024),
+            _generate_image_leonardo(meta["chapter1_prompt"], config.leonardo_api_key, width=896,  height=512),
+            _generate_image_leonardo(meta["chapter2_prompt"], config.leonardo_api_key, width=896,  height=512),
             return_exceptions=True
         )
-        images = [b if isinstance(b, bytes) else None for b in images_raw]
-        ok_count = sum(1 for i in images if i)
-        logger.info(f"✅ [3] Imágenes: {ok_count}/4 generadas en {time.time()-t2:.1f}s")
+        cover_img = images_raw[0] if isinstance(images_raw[0], bytes) else None
+        ch1_img   = images_raw[1] if isinstance(images_raw[1], bytes) else None
+        ch2_img   = images_raw[2] if isinstance(images_raw[2], bytes) else None
+        t3 = time.time()
+        ok_count = sum(1 for x in [cover_img, ch1_img, ch2_img] if x)
+        logger.info(f"✅ [3] Imágenes: {ok_count}/3 generadas en {t3-t2:.1f}s")
         synopsis = meta["synopsis"]
     else:
         logger.info("⏭️  [2/3] Sin LEONARDO_API_KEY — saltando sinopsis e imágenes")
@@ -463,31 +574,23 @@ async def generate_story(request: StoryRequest):
         lambda: _build_pdf(
             story_text=story_text,
             synopsis=synopsis,
-            title=request.prompt,
+            title=story_title,
             nombre=request.nombre,
-            cover_img=images[0],
-            internal_1_img=images[1],
-            internal_2_img=images[2],
-            back_img=images[3],
+            cover_img=cover_img,
+            chapter1_img=ch1_img,
+            chapter2_img=ch2_img,
         )
     )
     t4 = time.time()
     logger.info(f"✅ [4] PDF: {len(pdf_bytes)//1024}KB en {t4-t3:.1f}s")
     logger.info(f"🏁 TOTAL generate-story: {t4-t0:.1f}s | texto={t1-t0:.1f}s | meta={t2-t1:.1f}s | imgs={t3-t2:.1f}s | pdf={t4-t3:.1f}s")
 
-    from datetime import datetime
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    nombre_slug = (request.nombre or 'cuento').lower().replace(' ', '_')
-    filename = f"holmes_{nombre_slug}_{ts}.pdf"
+    title_slug = re.sub(r'[^a-z0-9]+', '_', story_title[:50].lower().strip()).strip('_')
+    filename = f"holmes_{title_slug}_{ts}.pdf"
 
-    cuentos_dir = os.path.join(os.path.dirname(__file__), "cuentos")
-    os.makedirs(cuentos_dir, exist_ok=True)
-    saved_path = os.path.join(cuentos_dir, filename)
-    with open(saved_path, "wb") as f:
-        f.write(pdf_bytes)
-    logger.info(f"💾 PDF guardado en cuentos/{filename}")
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
