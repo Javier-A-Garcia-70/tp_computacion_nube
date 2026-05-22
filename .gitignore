@@ -51,6 +51,8 @@ cuentos/*
 # Deploy
 .vercel
 .dockerignore.local
+vercel_project_url.txt
+LEVANTAR_BACKEND_DOCKER.md
 
 # Claude Code internal
 .claude/

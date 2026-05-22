@@ -210,7 +210,7 @@ function Bubble({ msg, avatarKey, onDownloadPdf }) {
               Si desea llevarse el relato, puedo llamar a Watson para que lo transcriba en papel.
             </p>
             <button
-              onClick={() => onDownloadPdf(msg.prompt)}
+              onClick={() => onDownloadPdf(msg.prompt, msg.storyText)}
               style={{
                 background: COLORS.accent, border: "none", color: "#F5EDD0",
                 padding: "5px 12px", borderRadius: 12, fontSize: 11,
@@ -258,13 +258,18 @@ export default function ChatScreen({ character = "holmes", name = "Sherlock Holm
     return () => clearInterval(t);
   }, [pdfLoading]);
 
-  async function downloadPdf(prompt) {
+  async function downloadPdf(prompt, storyText) {
     setPdfLoading(true);
     try {
       const res = await fetch(`${API_BASE}/generate-story`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, nombre: userName || null, formato: "pdf" }),
+        body: JSON.stringify({
+          prompt,
+          nombre: userName || null,
+          formato: "pdf",
+          ...(storyText ? { story_text: storyText } : {}),
+        }),
       });
       const blob = await res.blob();
       const disposition = res.headers.get("Content-Disposition") || "";
@@ -342,6 +347,7 @@ export default function ChatScreen({ character = "holmes", name = "Sherlock Holm
         sources: data.sources || [],
         modo: data.modo,
         prompt: currentInput,
+        storyText: data.modo === "cuento" ? data.answer : undefined,
       }]);
     } catch {
       setMessages(prev => [...prev, {

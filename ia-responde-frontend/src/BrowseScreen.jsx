@@ -107,7 +107,7 @@ function Category({ cat, onSelect }) {
   );
 }
 
-export default function BrowseScreen({ onSelectCharacter, user, displayName, onChangeName, onLogout }) {
+export default function BrowseScreen({ onSelectCharacter, user, displayName, onChangeName, onLogout, onRincon }) {
   const [menuOpen, setMenuOpen]   = useState(false);
   const [editOpen, setEditOpen]   = useState(false);
   const [draft,    setDraft]      = useState("");
@@ -229,12 +229,13 @@ export default function BrowseScreen({ onSelectCharacter, user, displayName, onC
         boxShadow: "4px 0 20px rgba(0,0,0,.15)",
       }}>
         {[
-          { icon: "💬", label: "Chats" },
+          { icon: "💬", label: "Chats", action: null },
+          { icon: "📚", label: "Rincón del Profe", action: "rincon" },
           { icon: "⚙️", label: "Configuración" },
         ].map(item => (
           <button
             key={item.label}
-            onClick={() => setMenuOpen(false)}
+            onClick={() => { if (item.action === "rincon") { setMenuOpen(false); onRincon && onRincon(); } else setMenuOpen(false); }}
             style={{
               display: "flex", alignItems: "center", gap: 12,
               padding: "16px 24px",

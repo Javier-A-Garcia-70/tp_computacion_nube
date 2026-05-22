@@ -11,7 +11,7 @@ class CloudConfig:
     """Configuración LoreChat — Anthropic + Voyage AI + pgvector"""
 
     def __init__(self):
-        load_dotenv(dotenv_path=_DOTENV_PATH, override=True)
+        load_dotenv(dotenv_path=_DOTENV_PATH, override=False)
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
         self.voyage_api_key = os.getenv("VOYAGE_API_KEY")
         self.voyage_model = os.getenv("VOYAGE_MODEL", "voyage-3")

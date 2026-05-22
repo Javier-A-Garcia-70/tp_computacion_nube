@@ -3,6 +3,7 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import LoginScreen from "./LoginScreen";
 import BrowseScreen from "./BrowseScreen";
 import ChatScreen from "./ChatScreen";
+import RinconProfeScreen from "./RinconProfeScreen";
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 
@@ -48,7 +49,10 @@ export default function App() {
               displayName={displayName}
               onChangeName={setDisplayName}
               onLogout={handleLogout}
+              onRincon={() => setView("rincon")}
             />
+          ) : view === "rincon" ? (
+            <RinconProfeScreen onBack={handleBack} />
           ) : (
             <ChatScreen
               key={character?.key}
