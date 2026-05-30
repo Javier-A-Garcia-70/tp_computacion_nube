@@ -20,7 +20,7 @@ export default function SideMenu({ open, onClose, onNavigate, onLogout, currentV
         {/* Logo */}
         <div style={{ padding: "24px 20px 16px", borderBottom: `1px solid ${T.border}` }}>
           <img src="/logo_rincon_libro.png" alt="El Rincón del Libro"
-            style={{ width: 140, objectFit: "contain", marginLeft: 3 }} />
+            style={{ width: 140, objectFit: "contain", marginLeft: -34 }} />
         </div>
 
         {/* Nav */}
