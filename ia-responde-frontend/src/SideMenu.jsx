@@ -15,7 +15,7 @@ export default function SideMenu({ open, onClose, onNavigate, onLogout, currentV
         transform: open ? "translateX(0)" : "translateX(-100%)",
         transition: "transform .25s ease",
         display: "flex", flexDirection: "column",
-        boxShadow: "4px 0 20px rgba(0,0,0,.15)",
+        boxShadow: open ? "4px 0 20px rgba(0,0,0,.15)" : "none",
       }}>
         {/* Logo */}
         <div style={{ paddingTop: 24, paddingRight: 20, paddingBottom: 16, paddingLeft: 0, borderBottom: `1px solid ${T.border}` }}>
