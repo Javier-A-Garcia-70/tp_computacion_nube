@@ -16,7 +16,9 @@
 .lorechat-container {
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 /* Desktop: chat ancho normal, sin frame de celular */

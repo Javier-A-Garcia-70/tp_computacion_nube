@@ -834,9 +834,15 @@ async def rincon_resumen(request: ResumenRequest):
             f"Corpus:\n{context}"
         )
 
-    raw = await _rincon_call(prompt, config, max_tokens=2000)
+    raw = await _rincon_call(prompt, config, max_tokens=3000)
     raw = re.sub(r"```json\s*|\s*```", "", raw).strip()
-    return json.loads(raw)
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not match:
+        raise HTTPException(status_code=500, detail="El modelo no devolvió JSON válido")
+    try:
+        return json.loads(match.group())
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"JSON inválido: {e}")
 
 
 @app.post("/rincon-profe/actividades")

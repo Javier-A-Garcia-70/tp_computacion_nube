@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000/ask";
-const API_BASE = API_URL.replace("/ask", "");
+const API_BASE = (process.env.REACT_APP_API_URL || "http://localhost:8000")
+  .replace(/\/+$/, "").replace(/\/ask$/, "");
+const API_URL = `${API_BASE}/ask`;
 
 const COLORS = {
   bg:             "#F5F3EF",
@@ -341,6 +342,7 @@ export default function ChatScreen({ character = "holmes", name = "Sherlock Holm
         }),
       });
       const data = await res.json();
+      if (!res.ok || !data?.answer) throw new Error(data?.detail || `Error ${res.status}`);
       setMessages(prev => [...prev, {
         id: Date.now() + 1, role: "ai",
         text: data.answer,
