@@ -45,18 +45,26 @@ def main():
             model=config.voyage_model
         )
 
-        logger.info("🔄 Generando embeddings con Voyage AI...")
+        BATCH_SIZE = 500
+        total = len(chunks)
+        total_batches = (total + BATCH_SIZE - 1) // BATCH_SIZE
+        logger.info(f"🔄 Procesando {total} chunks en {total_batches} lotes de {BATCH_SIZE}...")
 
-        db = PGVector.from_texts(
-            texts=texts,
-            embedding=embeddings,
-            metadatas=metadatas,
+        store = PGVector(
+            embeddings=embeddings,
             collection_name="lorechat_holmes",
             connection=config.database_url,
-            pre_delete_collection=True
+            pre_delete_collection=True,
         )
 
-        logger.info("✅ Base vectorial creada en pgvector")
+        for i in range(0, total, BATCH_SIZE):
+            batch_num = i // BATCH_SIZE + 1
+            end = min(i + BATCH_SIZE, total)
+            logger.info(f"📦 Lote {batch_num}/{total_batches} — chunks {i+1}–{end}")
+            store.add_texts(texts[i:end], metadatas=metadatas[i:end])
+            logger.info(f"   ✅ Lote {batch_num}/{total_batches} insertado ({end - i} chunks)")
+
+        logger.info(f"✅ {total} chunks insertados en pgvector (colección: lorechat_holmes)")
 
     except Exception as e:
         logger.error(f"❌ Error: {e}")
