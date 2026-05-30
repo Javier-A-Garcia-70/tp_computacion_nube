@@ -317,6 +317,14 @@ export default function ParaCasaScreen({ user, onOpenMenu }) {
     }}>
       <AppHeader title="Para Casa" user={user} onOpenMenu={onOpenMenu} />
 
+      {/* Descripción */}
+      <div style={{ padding: "14px 16px 0", flexShrink: 0 }}>
+        <p style={{ margin: 0, fontSize: 13, color: COLORS.textMuted, lineHeight: 1.6 }}>
+          Todo lo que necesitás para acompañar la lectura de tu hijo sin haber leído el libro. Elegí el texto en el campo de abajo y explorá las secciones. ¿El libro de tu hijo no está en la lista?{" "}
+          <span style={{ color: COLORS.accent, fontWeight: 600 }}>Agregalo acá</span>.
+        </p>
+      </div>
+
       {/* Selector de texto */}
       <div style={{ padding: "12px 16px 0", flexShrink: 0 }}>
         <Label>Texto seleccionado</Label>
