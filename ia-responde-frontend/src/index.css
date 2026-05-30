@@ -9,7 +9,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  background: #D2E4F0;
+  background: #FDF6EF;
   font-family: 'Inter', sans-serif;
 }
 
@@ -23,7 +23,7 @@
 @media (min-width: 640px) {
   .lorechat-outer {
     padding: 0;
-    background: #D2E4F0;
+    background: #FDF6EF;
   }
   .lorechat-container {
     max-width: 760px;

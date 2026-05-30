@@ -4,17 +4,17 @@ const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000/ask";
 const API_BASE = API_URL.replace("/ask", "");
 
 const COLORS = {
-  bg:             "#D2E4F0",
-  header:         "#98B6C8",
-  inputBar:       "#98B6C8",
+  bg:             "#FDF6EF",
+  header:         "#D47649",
+  inputBar:       "#ECD8C8",
   inputBg:        "#FFFFFF",
   bubbleAI:       "#FFFFFF",
-  bubbleLoading:  "#E8F1F8",
+  bubbleLoading:  "#FAE8D8",
   bubbleUser:     "#D47649",
   bubbleUserText: "#FFFFFF",
   textPrimary:    "#663A2A",
-  textMuted:      "#7A9AB0",
-  textDim:        "#98B6C8",
+  textMuted:      "#A07858",
+  textDim:        "#C0A080",
   accent:         "#D47649",
 };
 
