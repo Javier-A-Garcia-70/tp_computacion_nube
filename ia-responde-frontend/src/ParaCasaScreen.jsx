@@ -331,7 +331,8 @@ export default function ParaCasaScreen({ user, onOpenMenu }) {
       <div style={{
         display: "flex", borderBottom: `1px solid ${COLORS.border}`,
         marginTop: 12, flexShrink: 0, background: COLORS.card,
-        padding: "0 16px",
+        margin: "12px 16px 0",
+        borderRadius: 8,
       }}>
         {SECCIONES.map(s => (
           <SectionTab key={s.id} active={seccion === s.id} onClick={() => setSeccion(s.id)}>
