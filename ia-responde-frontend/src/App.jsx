@@ -10,13 +10,13 @@ const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 export default function App() {
   const [user,        setUser]        = useState(null);
   const [displayName, setDisplayName] = useState("");
-  const [view,        setView]        = useState("browse");
+  const [view,        setView]        = useState("rincon");
   const [character,   setCharacter]   = useState(null);
 
   function handleLogin(userData) {
     setUser(userData);
     setDisplayName(userData.name || "");
-    setView("browse");
+    setView("rincon");
   }
 
   function handleLogout() {

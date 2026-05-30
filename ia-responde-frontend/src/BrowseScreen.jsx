@@ -229,9 +229,9 @@ export default function BrowseScreen({ onSelectCharacter, user, displayName, onC
         boxShadow: "4px 0 20px rgba(0,0,0,.15)",
       }}>
         {[
-          { icon: "💬", label: "Chats", action: null },
           { icon: "📚", label: "Rincón del Profe", action: "rincon" },
-          { icon: "⚙️", label: "Configuración" },
+          { icon: "🏠", label: "Para Casa", action: null },
+          { icon: "💬", label: "Chat", action: null },
         ].map(item => (
           <button
             key={item.label}
@@ -249,12 +249,29 @@ export default function BrowseScreen({ onSelectCharacter, user, displayName, onC
           </button>
         ))}
 
-        {/* Cerrar sesión pushed to bottom */}
+        <div style={{ flex: 1 }} />
+
+        {/* Configuración justo antes de Cerrar Sesión */}
+        <button
+          onClick={() => setMenuOpen(false)}
+          style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "16px 24px",
+            fontSize: 14, fontWeight: 500, color: COLORS.text,
+            background: "none", border: "none",
+            cursor: "pointer", textAlign: "left", width: "100%",
+          }}
+        >
+          <span style={{ fontSize: 17, width: 22, textAlign: "center" }}>⚙️</span>
+          Configuración
+        </button>
+
+        {/* Cerrar sesión */}
         <button
           onClick={() => { setMenuOpen(false); onLogout && onLogout(); }}
           style={{
             display: "flex", alignItems: "center", gap: 12,
-            padding: "16px 24px", marginTop: "auto",
+            padding: "16px 24px",
             fontSize: 14, fontWeight: 500, color: COLORS.danger,
             background: "none",
             borderTop: "1px solid rgba(0,0,0,.1)",
