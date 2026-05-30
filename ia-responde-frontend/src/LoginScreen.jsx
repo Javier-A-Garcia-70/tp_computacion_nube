@@ -2,11 +2,10 @@ import { GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 
 const COLORS = {
-  bg:       "#BFB090",   // beige oscuro (más profundo que el header #DDD3B8)
-  card:     "#FDFAF4",
-  title:    "#1a140a",
-  subtitle: "#8a7a60",
-  divider:  "#E0D8C8",
+  bg:      "#D2E4F0",
+  card:    "#FDFCFB",
+  subtitle:"#98B6C8",
+  divider: "#C8D8E8",
 };
 
 export default function LoginScreen({ onLogin }) {
@@ -27,64 +26,63 @@ export default function LoginScreen({ onLogin }) {
   return (
     <div
       style={{
-        display: "flex",
-        alignItems: "center",
+        display:        "flex",
+        flexDirection:  "column",
+        alignItems:     "center",
         justifyContent: "center",
-        height: "100%",
-        background: COLORS.bg,
-        fontFamily: "'Inter', sans-serif",
+        height:         "100%",
+        background:     COLORS.bg,
+        fontFamily:     "'Inter', sans-serif",
+        gap:            40,
+        padding:        "0 32px",
       }}
     >
+      {/* Logo suelto, sin card */}
+      <img
+        src="/logo_rincon_libro.png"
+        alt="El Rincón del Libro"
+        style={{
+          width:     220,
+          maxWidth:  "70%",
+          objectFit: "contain",
+        }}
+      />
+
+      {/* Card de login */}
       <div
         style={{
           background:    COLORS.card,
-          borderRadius:  24,
-          padding:       "48px 40px",
+          borderRadius:  20,
+          padding:       "36px 32px",
           display:       "flex",
           flexDirection: "column",
           alignItems:    "center",
-          gap:           20,
-          boxShadow:     "0 12px 40px rgba(0,0,0,.18)",
-          width:         300,
+          gap:           16,
+          boxShadow:     "0 8px 32px rgba(0,0,0,.12)",
+          width:         "100%",
+          maxWidth:      320,
         }}
       >
-        {/* Icono */}
-        <div style={{ fontSize: 48, lineHeight: 1 }}>🔍</div>
-
-        {/* Título */}
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              fontSize:   22,
-              fontWeight: 700,
-              color:      COLORS.title,
-              letterSpacing: "-0.3px",
-            }}
-          >
-            LoreChat
-          </div>
-          <div
-            style={{
-              fontSize:   12,
-              color:      COLORS.subtitle,
-              marginTop:  5,
-              lineHeight: 1.4,
-            }}
-          >
-            Conversaciones con personajes de la literatura
-          </div>
-        </div>
-
-        {/* Separador */}
         <div
           style={{
-            width:      "100%",
-            borderTop:  `1px solid ${COLORS.divider}`,
-            margin:     "4px 0",
+            fontSize:      11,
+            fontWeight:    600,
+            letterSpacing: "0.08em",
+            color:         COLORS.subtitle,
+            textTransform: "uppercase",
+            marginBottom:  4,
+          }}
+        >
+          Acceso a la plataforma
+        </div>
+
+        <div
+          style={{
+            width:     "100%",
+            borderTop: `1px solid ${COLORS.divider}`,
           }}
         />
 
-        {/* Botón Google */}
         <GoogleLogin
           onSuccess={handleSuccess}
           onError={() => console.error("Google login fallido")}
@@ -92,15 +90,15 @@ export default function LoginScreen({ onLogin }) {
           locale="es"
           shape="rectangular"
           size="large"
-          width="240"
+          width="256"
           theme="outline"
         />
 
         <div
           style={{
-            fontSize:  10,
-            color:     COLORS.subtitle,
-            textAlign: "center",
+            fontSize:   10,
+            color:      COLORS.subtitle,
+            textAlign:  "center",
             lineHeight: 1.5,
           }}
         >

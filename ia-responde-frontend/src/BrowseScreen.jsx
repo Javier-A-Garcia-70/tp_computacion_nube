@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 
 const COLORS = {
-  bg:      "#EDE5D0",
-  header:  "#DDD3B8",
-  text:    "#1a140a",
-  textMuted: "#8a7a60",
-  menuBg:  "#FFFFFF",
-  danger:  "#8B2020",
-  overlay: "rgba(0,0,0,.35)",
+  bg:        "#D2E4F0",
+  header:    "#98B6C8",
+  text:      "#663A2A",
+  textMuted: "#7A9AB0",
+  menuBg:    "#FFFFFF",
+  danger:    "#8B2020",
+  overlay:   "rgba(0,0,0,.35)",
 };
 
 const AVATARS = {

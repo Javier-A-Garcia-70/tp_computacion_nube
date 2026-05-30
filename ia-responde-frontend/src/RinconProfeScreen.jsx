@@ -3,15 +3,15 @@ import { useState, useEffect } from "react";
 const API = process.env.REACT_APP_API_URL || "http://localhost:8000";
 
 const COLORS = {
-  bg:        "#EDE5D0",
-  header:    "#DDD3B8",
-  text:      "#1a140a",
-  textMuted: "#8a7a60",
-  card:      "#FDFAF4",
-  accent:    "#5a3a1a",
-  accentSoft:"#e8dcc8",
-  border:    "#d4c9b0",
-  danger:    "#8B2020",
+  bg:         "#D2E4F0",
+  header:     "#98B6C8",
+  text:       "#663A2A",
+  textMuted:  "#7A9AB0",
+  card:       "#FDFCFB",
+  accent:     "#D47649",
+  accentSoft: "#F0D8C8",
+  border:     "#B8CDD8",
+  danger:     "#8B2020",
 };
 
 // ── helpers UI ────────────────────────────────────────────────────────────────
