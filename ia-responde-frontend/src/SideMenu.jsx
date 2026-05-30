@@ -18,9 +18,9 @@ export default function SideMenu({ open, onClose, onNavigate, onLogout, currentV
         boxShadow: open ? "4px 0 20px rgba(0,0,0,.15)" : "none",
       }}>
         {/* Logo */}
-        <div style={{ paddingTop: 24, paddingRight: 20, paddingBottom: 16, paddingLeft: 0, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ paddingTop: 24, paddingRight: 20, paddingBottom: 16, paddingLeft: 20, borderBottom: `1px solid ${T.border}` }}>
           <img src="/logo_rincon_libro.png" alt="El Rincón del Libro"
-            style={{ width: 140, objectFit: "contain" }} />
+            style={{ width: 90, objectFit: "contain" }} />
         </div>
 
         {/* Nav */}
