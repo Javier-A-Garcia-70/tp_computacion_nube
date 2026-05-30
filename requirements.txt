@@ -1,5 +1,4 @@
 # Para embeddings en pgvector
-langchain_postgres==0.0.17
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-dotenv==1.0.0
