@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import AppHeader from "./AppHeader";
 
 const API = process.env.REACT_APP_API_URL || "http://localhost:8000";
 
@@ -412,7 +413,7 @@ const SECCIONES = [
   { id: "personajes", label: "Personajes" },
 ];
 
-export default function RinconProfeScreen({ onBack }) {
+export default function RinconProfeScreen({ user, onOpenMenu }) {
   const [seccion,  setSeccion]  = useState("resumen");
   const [textos, setTextos] = useState([{ id: "todos", label: "Todos los textos" }]);
   const [textoId,  setTextoId]  = useState("todos");
@@ -430,32 +431,7 @@ export default function RinconProfeScreen({ onBack }) {
       height: "100%", background: COLORS.bg,
       fontFamily: "'Inter', sans-serif",
     }}>
-      {/* Header */}
-      <div style={{
-        background: COLORS.header,
-        padding: "14px 16px 10px",
-        display: "flex", alignItems: "center", gap: 12,
-        flexShrink: 0,
-      }}>
-        <button
-          onClick={onBack}
-          style={{
-            background: "none", border: "none",
-            cursor: "pointer", padding: 4,
-            fontSize: 18, color: COLORS.text,
-          }}
-        >
-          ←
-        </button>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>
-            Rincón del Profe
-          </div>
-          <div style={{ fontSize: 11, color: COLORS.textMuted }}>
-            Herramientas para docentes y familias
-          </div>
-        </div>
-      </div>
+      <AppHeader title="Rincón del Profe" user={user} onOpenMenu={onOpenMenu} />
 
       {/* Selector de texto */}
       <div style={{ padding: "12px 16px 0", flexShrink: 0 }}>
