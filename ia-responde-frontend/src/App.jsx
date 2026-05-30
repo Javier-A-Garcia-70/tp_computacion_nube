@@ -5,6 +5,7 @@ import LoginScreen from "./LoginScreen";
 import BrowseScreen from "./BrowseScreen";
 import ChatScreen from "./ChatScreen";
 import RinconProfeScreen from "./RinconProfeScreen";
+import ParaCasaScreen from "./ParaCasaScreen";
 import SideMenu from "./SideMenu";
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
@@ -17,8 +18,8 @@ const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 function renderView(view, props) {
   switch (view) {
     case "rincon": return <RinconProfeScreen {...props} />;
+    case "casa":   return <ParaCasaScreen      {...props} />;
     case "browse": return <BrowseScreen      {...props} />;
-    // "casa" y futuras secciones: agregar acá
     default:       return <BrowseScreen      {...props} />;
   }
 }

@@ -925,3 +925,108 @@ async def rincon_personajes(request: RinconRequest):
             return json.loads(patched)
         except json.JSONDecodeError:
             return {"personajes": [], "_error": "Respuesta truncada del modelo"}
+
+
+# ─── Para Casa ────────────────────────────────────────────────────────────────
+
+class ParaCasaRequest(BaseModel):
+    texto_id: str = "todos"
+
+
+@app.post("/para-casa/de-que-trata")
+async def casa_de_que_trata(request: ParaCasaRequest):
+    loop = asyncio.get_running_loop()
+    context = await loop.run_in_executor(
+        None,
+        lambda: _retrieve_context(app.state.qa_service, "trama argumento historia personajes conflicto", texto_id=request.texto_id, k=12)
+    )
+
+    prompt = (
+        "Sos un asistente que ayuda a padres a entender los libros que leen sus hijos. "
+        "Explicá el siguiente texto de forma clara y simple, sin tecnicismos. "
+        "Respondé ÚNICAMENTE con un JSON válido (sin markdown, sin bloques de código) con esta estructura:\n"
+        '{"titulo_informal": "string (nombre coloquial del libro, ej: El sabueso de los Baskerville)", '
+        '"de_que_trata": "string (3 a 5 oraciones simples explicando de qué va el libro)", '
+        '"personajes_principales": [{"nombre": "string", "quien_es": "string (1 oración simple)"}], '
+        '"como_termina": "string (resolución general sin spoilers excesivos, 2 oraciones)"}\n\n'
+        f"Corpus:\n{context}"
+    )
+
+    raw = await _rincon_call(prompt, config, max_tokens=1500)
+    raw = re.sub(r"```json\s*|\s*```", "", raw).strip()
+    return json.loads(raw)
+
+
+@app.post("/para-casa/preguntas-charla")
+async def casa_preguntas_charla(request: ParaCasaRequest):
+    loop = asyncio.get_running_loop()
+    context = await loop.run_in_executor(
+        None,
+        lambda: _retrieve_context(app.state.qa_service, "trama conflicto valores decisiones personajes", texto_id=request.texto_id, k=10)
+    )
+
+    prompt = (
+        "Sos un asistente que ayuda a padres a conectar con sus hijos a través de la lectura. "
+        "Generá preguntas simples y naturales para que un padre le haga a su hijo durante la cena o antes de dormir. "
+        "Las preguntas deben invitar a conversar, no a evaluar. "
+        "Respondé ÚNICAMENTE con un JSON válido (sin markdown, sin bloques de código) con esta estructura:\n"
+        '{"preguntas": ['
+        '{"pregunta": "string", "por_que_sirve": "string (en 1 oración, para qué sirve hacerla)"}'
+        ']}\n'
+        "Generá exactamente 4 preguntas.\n\n"
+        f"Corpus:\n{context}"
+    )
+
+    raw = await _rincon_call(prompt, config, max_tokens=1200)
+    raw = re.sub(r"```json\s*|\s*```", "", raw).strip()
+    return json.loads(raw)
+
+
+@app.post("/para-casa/glosario")
+async def casa_glosario(request: ParaCasaRequest):
+    loop = asyncio.get_running_loop()
+    context = await loop.run_in_executor(
+        None,
+        lambda: _retrieve_context(app.state.qa_service, "vocabulario términos difíciles descripción lenguaje", texto_id=request.texto_id, k=12)
+    )
+
+    prompt = (
+        "Sos un asistente educativo. "
+        "Analizá el siguiente corpus literario e identificá las palabras o frases que pueden ser difíciles para un chico. "
+        "Para cada una, dá una definición muy simple y un ejemplo de uso en contexto del libro. "
+        "Respondé ÚNICAMENTE con un JSON válido (sin markdown, sin bloques de código) con esta estructura:\n"
+        '{"palabras": ['
+        '{"palabra": "string", "definicion_simple": "string", "en_el_libro": "string (cómo aparece o se usa en el texto)"}'
+        ']}\n'
+        "Incluí entre 6 y 10 palabras.\n\n"
+        f"Corpus:\n{context}"
+    )
+
+    raw = await _rincon_call(prompt, config, max_tokens=1500)
+    raw = re.sub(r"```json\s*|\s*```", "", raw).strip()
+    return json.loads(raw)
+
+
+@app.post("/para-casa/datos-curiosos")
+async def casa_datos_curiosos(request: ParaCasaRequest):
+    loop = asyncio.get_running_loop()
+    context = await loop.run_in_executor(
+        None,
+        lambda: _retrieve_context(app.state.qa_service, "autor época histórica contexto datos curiosidades", texto_id=request.texto_id, k=10)
+    )
+
+    prompt = (
+        "Sos un asistente que hace la lectura más entretenida para las familias. "
+        "Basándote en el siguiente corpus, generá datos curiosos sobre el autor, la época o el libro "
+        "que un padre pueda contarle a su hijo para hacer la lectura más interesante. "
+        "Respondé ÚNICAMENTE con un JSON válido (sin markdown, sin bloques de código) con esta estructura:\n"
+        '{"datos": ['
+        '{"titulo": "string (título corto del dato)", "dato": "string (el dato en 2-3 oraciones simples y entretenidas)"}'
+        ']}\n'
+        "Generá exactamente 4 datos curiosos.\n\n"
+        f"Corpus:\n{context}"
+    )
+
+    raw = await _rincon_call(prompt, config, max_tokens=1200)
+    raw = re.sub(r"```json\s*|\s*```", "", raw).strip()
+    return json.loads(raw)
