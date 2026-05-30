@@ -21,7 +21,7 @@ class CloudConfig:
         # CORS dinámico para frontend (CSV en .env)
         cors_raw = os.getenv(
             "CORS_ALLOW_ORIGINS",
-            "http://localhost:3000,http://localhost:3001,https://ia-responde-mvp.vercel.app"
+            "http://localhost:3000,http://localhost:3001,https://tp-computacion-nube.vercel.app"
         )
         self.cors_allow_origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
 
