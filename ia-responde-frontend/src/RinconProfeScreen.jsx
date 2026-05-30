@@ -415,6 +415,7 @@ export default function RinconProfeScreen({ user, onOpenMenu }) {
         marginTop: 12,
         flexShrink: 0,
         background: COLORS.card,
+        padding: "0 16px",
       }}>
         {SECCIONES.map(s => (
           <SectionBtn
