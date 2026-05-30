@@ -10,8 +10,8 @@
  */
 const SECTIONS = [
   { view: "rincon", label: "Rincón del Profe", icon: "📚" },
-  { view: "browse", label: "Chat",             icon: "💬" },
   { view: "casa",   label: "Para Casa",        icon: "🏠" },
+  { view: "browse", label: "Chat",             icon: "💬" },
 ];
 
 export default SECTIONS;
