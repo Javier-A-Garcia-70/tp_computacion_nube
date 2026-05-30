@@ -66,7 +66,7 @@ def main():
             model=config.voyage_model
         )
 
-        BATCH_SIZE = 500
+        BATCH_SIZE = 100
         COLLECTION = "lorechat_holmes"
         total = len(chunks)
         total_batches = (total + BATCH_SIZE - 1) // BATCH_SIZE
