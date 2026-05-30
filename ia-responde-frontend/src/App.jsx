@@ -2,6 +2,7 @@ import { useState } from "react";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import SECTIONS from "./sections";
 import LoginScreen from "./LoginScreen";
+import HomeScreen from "./HomeScreen";
 import BrowseScreen from "./BrowseScreen";
 import ChatScreen from "./ChatScreen";
 import RinconProfeScreen from "./RinconProfeScreen";
@@ -27,7 +28,7 @@ function renderView(view, props) {
 export default function App() {
   const [user,        setUser]        = useState(null);
   const [displayName, setDisplayName] = useState("");
-  const [view,        setView]        = useState("rincon");
+  const [view,        setView]        = useState("home");
   const [character,   setCharacter]   = useState(null);
   const [menuOpen,    setMenuOpen]    = useState(false);
 
@@ -37,7 +38,7 @@ export default function App() {
   function handleLogin(userData) {
     setUser(userData);
     setDisplayName(userData.name || "");
-    setView("rincon");
+    setView("home");
   }
 
   function handleLogout() {
@@ -63,6 +64,8 @@ export default function App() {
         <div className="lorechat-container" style={{ position: "relative" }}>
           {!user ? (
             <LoginScreen onLogin={handleLogin} />
+          ) : view === "home" ? (
+            <HomeScreen user={user} onNavigate={navigate} />
           ) : view === "chat" ? (
             <ChatScreen
               key={character?.key}

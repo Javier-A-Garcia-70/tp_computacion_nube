@@ -9,9 +9,9 @@
  *   component - import lazy o nombre del componente (se resuelve en App.jsx)
  */
 const SECTIONS = [
-  { view: "rincon", label: "Rincón del Profe", icon: "📚" },
-  { view: "casa",   label: "Para Casa",        icon: "🏠" },
-  { view: "browse", label: "Chat",             icon: "💬" },
+  { view: "rincon", label: "Rincón del Profe", icon: "📚", description: "Herramientas para docentes" },
+  { view: "casa",   label: "Para Casa",        icon: "🏠", description: "Actividades para el hogar" },
+  { view: "browse", label: "Chat",             icon: "💬", description: "Conversá con personajes literarios" },
 ];
 
 export default SECTIONS;
