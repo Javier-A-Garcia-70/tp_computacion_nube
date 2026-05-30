@@ -380,13 +380,13 @@ const SECCIONES = [
 
 export default function RinconProfeScreen({ user, onOpenMenu }) {
   const [seccion,  setSeccion]  = useState("resumen");
-  const [textos, setTextos] = useState([{ id: "todos", label: "Todos los textos" }]);
-  const [textoId,  setTextoId]  = useState("todos");
+  const [textos, setTextos] = useState([]);
+  const [textoId,  setTextoId]  = useState("");
 
   useEffect(() => {
     fetch(`${API}/textos`)
       .then(r => r.json())
-      .then(data => setTextos([{ id: "todos", label: "Todos los textos" }, ...data.textos]))
+      .then(data => { setTextos(data.textos); })
       .catch(() => {});
   }, []);
 
@@ -404,7 +404,7 @@ export default function RinconProfeScreen({ user, onOpenMenu }) {
         <Select
           value={textoId}
           onChange={setTextoId}
-          options={textos.map(t => ({ value: t.id, label: t.label }))}
+          options={[{ value: "", label: "— Seleccioná un texto —" }, ...textos.map(t => ({ value: t.id, label: t.label }))]}
         />
       </div>
 
