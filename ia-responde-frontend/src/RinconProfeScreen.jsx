@@ -125,7 +125,6 @@ function Select({ value, onChange, options }) {
 // ── Sección Resumen ───────────────────────────────────────────────────────────
 
 function SeccionResumen({ textoId }) {
-  const [nivel, setNivel]     = useState("aula");
   const [result, setResult]   = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
@@ -136,7 +135,7 @@ function SeccionResumen({ textoId }) {
       const res = await fetch(`${API}/rincon-profe/resumen`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ texto_id: textoId, nivel }),
+        body: JSON.stringify({ texto_id: textoId, nivel: "aula" }),
       });
       if (!res.ok) throw new Error(await res.text());
       setResult(await res.json());
@@ -149,19 +148,13 @@ function SeccionResumen({ textoId }) {
 
   return (
     <div>
-      <Label>Nivel</Label>
-      <Select
-        value={nivel}
-        onChange={setNivel}
-        options={[
-          { value: "aula",  label: "Para el aula" },
-          { value: "casa",  label: "Para explicar en casa" },
-        ]}
-      />
+      <div style={{ fontSize: 13, color: COLORS.textMuted, marginTop: 8 }}>
+        Análisis estructurado del texto para usar como base de clase: tipo de texto, época, temas, personajes, recursos literarios, valores y ejes de debate.
+      </div>
       <ActionBtn onClick={generar} loading={loading}>Generar resumen</ActionBtn>
       {error && <div style={{ color: COLORS.danger, fontSize: 12, marginTop: 8 }}>{error}</div>}
 
-      {result && nivel === "aula" && (
+      {result && (
         <Card>
           <Label>Tipo de texto</Label>
           <div style={{ fontSize: 13, color: COLORS.text }}>{result.tipo_texto}</div>
@@ -192,25 +185,6 @@ function SeccionResumen({ textoId }) {
 
           <Label>Nivel sugerido</Label>
           <div style={{ fontSize: 13, color: COLORS.text }}>{result.nivel_sugerido}</div>
-        </Card>
-      )}
-
-      {result && nivel === "casa" && (
-        <Card>
-          <Label>De qué trata</Label>
-          <div style={{ fontSize: 13, color: COLORS.text, lineHeight: 1.6 }}>{result.resumen}</div>
-
-          <Label>Preguntas para hacerle a tu hijo</Label>
-          {result.preguntas?.map((p, i) => (
-            <div key={i} style={{ fontSize: 13, color: COLORS.text, marginBottom: 6 }}>
-              {i + 1}. {p}
-            </div>
-          ))}
-
-          <Label>Datos curiosos</Label>
-          {result.datos_curiosos?.map((d, i) => (
-            <div key={i} style={{ fontSize: 13, color: COLORS.text, marginBottom: 4 }}>• {d}</div>
-          ))}
         </Card>
       )}
     </div>
